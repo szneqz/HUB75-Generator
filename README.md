@@ -1,1 +1,1 @@
-# appHUB75-Generator
+# HUB75-Generator
