@@ -32,15 +32,67 @@ ApplicationWindow {
                 text: "Browse..."
                 onClicked: {
                     var selected = FileDialogHelper.openFile("Select an image", "Images (*.png *.jpg *.bmp)")
-                    if (selected !== "")
+                    if (selected !== "") {
                         pathField.text = selected
+                        outputArea.text = ""
+                    }
                 }
             }
 
-            Button {
-                text: "Generate code"
-                onClicked: {
-                    outputArea.text = imageReader.loadAndRead(pathField.text)
+            Row {
+                spacing: 8
+                width: parent.width
+
+                Button {
+                    text: "Generate code"
+                    onClicked: {
+                        outputArea.text = "Calculating... Please wait!"
+                        Qt.callLater(function() {
+                        outputArea.text = imageReader.loadAndRead(pathField.text, parseInt(colThres1.text), parseInt(colThres2.text), parseInt(colThres3.text))
+                        })
+                    }
+                }
+
+                TextField {
+                    id: colThres1
+                    width: 80
+                    placeholderText: "Color threshold 1"
+                    text: "64"
+                    validator: IntValidator { bottom: 0; top: 255 }
+                    onActiveFocusChanged: {
+                        let v = parseInt(text)
+                        if (isNaN(v)) v = 0
+                        text = Math.max(0, Math.min(255, v))
+                    }
+                    inputMethodHints: Qt.ImhDigitsOnly
+                }
+
+                TextField {
+                    id: colThres2
+                    width: 80
+                    placeholderText: "Color threshold 2"
+                    text: "128"
+                    validator: IntValidator { bottom: 0; top: 255 }
+                    onActiveFocusChanged: {
+                        let v = parseInt(text)
+                        if (isNaN(v)) v = 0
+                        text = Math.max(0, Math.min(255, v))
+                    }
+                    inputMethodHints: Qt.ImhDigitsOnly
+                }
+
+                TextField {
+                    id: colThres3
+                    width: 80
+                    placeholderText: "Color threshold 3"
+                    text: "192"
+                    validator: IntValidator { bottom: 0; top: 255 }
+                    onActiveFocusChanged: {
+                        let v = parseInt(text)
+                        if (isNaN(v)) v = 0
+                        text = Math.max(0, Math.min(255, v))
+                    }
+                    inputMethodHints: Qt.ImhDigitsOnly
                 }
             }
 
@@ -116,10 +168,22 @@ ApplicationWindow {
                 }
             }
 
-            Button {
-                text: "Copy Output"
-                onClicked: {
-                    imageReader.copyText(outputArea.text)
+            Row {
+                spacing: 8
+                width: parent.width
+
+                Button {
+                    text: "Copy Output"
+                    onClicked: {
+                        imageReader.copyText(outputArea.text)
+                    }
+                }
+
+                Button {
+                    text: "Clear Output"
+                    onClicked: {
+                        outputArea.text = ""
+                    }
                 }
             }
         }

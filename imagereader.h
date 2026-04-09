@@ -14,6 +14,6 @@ class ImageReader : public QObject
 public:
     explicit ImageReader(QObject *parent = nullptr);
 
-    Q_INVOKABLE QString loadAndRead(const QString &path);
+    Q_INVOKABLE QString loadAndRead(const QString &path, const int t1, const int t2, const int t3);
     Q_INVOKABLE void copyText(const QString &text);
 };
