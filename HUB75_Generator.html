@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Image Pixel Reader</title>
+
+<style>
+    body {
+        margin: 0;
+        font-family: monospace;
+        background: #121212;
+        color: #ddd;
+        height: 100vh;
+        display: flex;
+    }
+
+    .container {
+        display: flex;
+        width: 100%;
+        height: 100%;
+        padding: 10px;
+        gap: 10px;
+        box-sizing: border-box;
+    }
+
+    .left {
+        width: 35%;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .right {
+        width: 65%;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    input, button, textarea {
+        background: #1e1e1e;
+        color: #ddd;
+        border: 1px solid #333;
+        padding: 6px;
+        font-family: monospace;
+    }
+
+    button {
+        cursor: pointer;
+    }
+
+    .row {
+        display: flex;
+        gap: 8px;
+    }
+
+    #preview {
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        object-fit: contain;
+        image-rendering: pixelated;
+        border: 1px solid #333;
+        background: #000;
+    }
+
+    #output {
+        flex: 1;
+        width: 99%;
+        resize: none;
+        white-space: pre;
+        overflow: auto;
+    }
+</style>
+</head>
+
+<body>
+<div class="container">
+
+    <!-- LEFT SIDE -->
+    <div class="left">
+        <input type="file" id="fileInput" accept="image/*" />
+
+        <div class="row">
+            <button onclick="generate()">Generate code</button>
+
+            <input id="th1" style="width:80px" value="64" />
+            <input id="th2" style="width:80px" value="128" />
+            <input id="th3" style="width:80px" value="192" />
+        </div>
+
+        <img id="preview" />
+
+    </div>
+
+    <!-- RIGHT SIDE -->
+    <div class="right">
+
+        <textarea id="output" readonly></textarea>
+
+        <div class="row">
+            <button onclick="copyOutput()">Copy Output</button>
+            <button onclick="clearOutput()">Clear Output</button>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+const preview = document.getElementById("preview");
+const output = document.getElementById("output");
+const fileInput = document.getElementById("fileInput");
+
+let currentImage = new Image();
+let canvas = document.createElement("canvas");
+let ctx = canvas.getContext("2d");
+let pathUrl = "";
+
+fileInput.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const url = URL.createObjectURL(file);
+    pathUrl = url;
+    preview.src = url;
+
+    currentImage = new Image();
+    currentImage.src = url;
+
+    output.value = "";
+});
+
+function calculateColorBits(v, t1, t2, t3) {
+    if (v < t1) return "00";
+    if (v < t2) return "01";
+    if (v < t3) return "10";
+    return "11";
+}
+
+function loadAndRead(path, t1, t2, t3) {
+    if (t1 > t2 || t1 > t3 || t2 > t3) {
+        return "Wrong color threshold values (T1 < T2 < T3)";
+    }
+
+    if (!currentImage.complete || !pathUrl) {
+        return "Image not loaded yet";
+    }
+
+    canvas.width = currentImage.width;
+    canvas.height = currentImage.height;
+    ctx.drawImage(currentImage, 0, 0);
+
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+
+    let result = "{\n";
+
+    for (let y = 0; y < canvas.height; y++) {
+        result += "{";
+
+        for (let x = 0; x < canvas.width; x++) {
+            const i = (y * canvas.width + x) * 4;
+
+            const r = imgData[i];
+            const g = imgData[i + 1];
+            const b = imgData[i + 2];
+
+            result += "0b00"
+                + calculateColorBits(b, t1, t2, t3)
+                + calculateColorBits(g, t1, t2, t3)
+                + calculateColorBits(r, t1, t2, t3);
+
+            if (x < canvas.width - 1) result += ", ";
+        }
+
+        result += "}";
+        if (y < canvas.height - 1) result += ",\n";
+    }
+
+    result += "\n}";
+    return result;
+}
+
+function generate() {
+    output.value = "Calculating... Please wait!";
+
+    setTimeout(() => {
+        const t1 = parseInt(document.getElementById("th1").value || "0");
+        const t2 = parseInt(document.getElementById("th2").value || "0");
+        const t3 = parseInt(document.getElementById("th3").value || "0");
+
+        output.value = loadAndRead(pathUrl, t1, t2, t3);
+    }, 10);
+}
+
+function copyOutput() {
+    navigator.clipboard.writeText(output.value);
+}
+
+function clearOutput() {
+    output.value = "";
+}
+</script>
+
+</body>
+</html>
