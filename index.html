@@ -83,10 +83,6 @@
 
         <div class="row">
             <button onclick="generate()">Generate code</button>
-
-            <input id="th1" style="width:80px" value="64" />
-            <input id="th2" style="width:80px" value="128" />
-            <input id="th3" style="width:80px" value="192" />
         </div>
 
         <img id="preview" />
@@ -131,17 +127,23 @@ fileInput.addEventListener("change", (e) => {
     output.value = "";
 });
 
-function calculateColorBits(v, t1, t2, t3) {
-    if (v < t1) return "00";
-    if (v < t2) return "01";
-    if (v < t3) return "10";
-    return "11";
+// Convert 0..255 -> 0..31
+function to5Bit(v) {
+    return (v >> 3) & 0x1F;
 }
 
-function loadAndRead(path, t1, t2, t3) {
-    if (t1 > t2 || t1 > t3 || t2 > t3) {
-        return "Wrong color threshold values (T1 < T2 < T3)";
-    }
+// Pack into:
+// RRRRR GGGGG BBBBB
+function packRGB555(r, g, b) {
+
+    const r5 = to5Bit(r);
+    const g5 = to5Bit(g);
+    const b5 = to5Bit(b);
+
+    return (r5 << 10) | (g5 << 5) | b5;
+}
+
+function loadAndRead() {
 
     if (!currentImage.complete || !pathUrl) {
         return "Image not loaded yet";
@@ -149,47 +151,56 @@ function loadAndRead(path, t1, t2, t3) {
 
     canvas.width = currentImage.width;
     canvas.height = currentImage.height;
+
     ctx.drawImage(currentImage, 0, 0);
 
-    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    const imgData =
+        ctx.getImageData(0, 0, canvas.width, canvas.height).data;
 
     let result = "{\n";
 
     for (let y = 0; y < canvas.height; y++) {
-        result += "{";
+
+        result += "    {";
 
         for (let x = 0; x < canvas.width; x++) {
+
             const i = (y * canvas.width + x) * 4;
 
-            const r = imgData[i];
+            const r = imgData[i + 0];
             const g = imgData[i + 1];
             const b = imgData[i + 2];
 
-            result += "0b00"
-                + calculateColorBits(b, t1, t2, t3)
-                + calculateColorBits(g, t1, t2, t3)
-                + calculateColorBits(r, t1, t2, t3);
+            const packed = packRGB555(r, g, b);
 
-            if (x < canvas.width - 1) result += ", ";
+            result +=
+                "0x"
+                + packed
+                    .toString(16)
+                    .toUpperCase()
+                    .padStart(4, '0');
+
+            if (x < canvas.width - 1)
+                result += ", ";
         }
 
         result += "}";
-        if (y < canvas.height - 1) result += ",\n";
+
+        if (y < canvas.height - 1)
+            result += ",\n";
     }
 
     result += "\n}";
+
     return result;
 }
 
 function generate() {
+
     output.value = "Calculating... Please wait!";
 
     setTimeout(() => {
-        const t1 = parseInt(document.getElementById("th1").value || "0");
-        const t2 = parseInt(document.getElementById("th2").value || "0");
-        const t3 = parseInt(document.getElementById("th3").value || "0");
-
-        output.value = loadAndRead(pathUrl, t1, t2, t3);
+        output.value = loadAndRead();
     }, 10);
 }
 
