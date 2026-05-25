@@ -174,11 +174,12 @@ function loadAndRead() {
             const packed = packRGB555(r, g, b);
 
             result +=
-                "0x"
+                "{0x"
                 + packed
                     .toString(16)
                     .toUpperCase()
-                    .padStart(4, '0');
+                    .padStart(4, '0')
+                + "}";
 
             if (x < canvas.width - 1)
                 result += ", ";
