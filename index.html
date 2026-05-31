@@ -55,8 +55,13 @@
         gap: 8px;
     }
 
-    #preview {
-        width: 100%;
+    .preview-container {
+        display: flex;
+        gap: 10px;
+    }
+
+    .preview-container img {
+        width: 50%;
         aspect-ratio: 1 / 1;
         object-fit: contain;
         image-rendering: pixelated;
@@ -77,19 +82,25 @@
 <body>
 <div class="container">
 
-    <!-- LEFT SIDE -->
     <div class="left">
+
+        <label>Main image:</label>
         <input type="file" id="fileInput" accept="image/*" />
+
+        <label>Mask image:</label>
+        <input type="file" id="maskInput" accept="image/*" />
 
         <div class="row">
             <button onclick="generate()">Generate code</button>
         </div>
 
-        <img id="preview" />
+        <div class="preview-container">
+            <img id="preview" />
+            <img id="maskPreview" />
+        </div>
 
     </div>
 
-    <!-- RIGHT SIDE -->
     <div class="right">
 
         <textarea id="output" readonly></textarea>
@@ -105,24 +116,51 @@
 
 <script>
 const preview = document.getElementById("preview");
+const maskPreview = document.getElementById("maskPreview");
 const output = document.getElementById("output");
+
 const fileInput = document.getElementById("fileInput");
+const maskInput = document.getElementById("maskInput");
 
 let currentImage = new Image();
+let maskImage = new Image();
+
 let canvas = document.createElement("canvas");
 let ctx = canvas.getContext("2d");
+
 let pathUrl = "";
+let maskUrl = "";
 
 fileInput.addEventListener("change", (e) => {
+
     const file = e.target.files[0];
     if (!file) return;
 
     const url = URL.createObjectURL(file);
+
     pathUrl = url;
+
     preview.src = url;
 
     currentImage = new Image();
     currentImage.src = url;
+
+    output.value = "";
+});
+
+maskInput.addEventListener("change", (e) => {
+
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const url = URL.createObjectURL(file);
+
+    maskUrl = url;
+
+    maskPreview.src = url;
+
+    maskImage = new Image();
+    maskImage.src = url;
 
     output.value = "";
 });
@@ -133,28 +171,51 @@ function to5Bit(v) {
 }
 
 // Pack into:
-// RRRRR GGGGG BBBBB
-function packRGB555(r, g, b) {
+// A RRRRR GGGGG BBBBB
+function packRGB555A1(r, g, b, alphaBit) {
 
     const r5 = to5Bit(r);
     const g5 = to5Bit(g);
     const b5 = to5Bit(b);
 
-    return (r5 << 10) | (g5 << 5) | b5;
+    return (alphaBit << 15)
+         | (r5 << 10)
+         | (g5 << 5)
+         | b5;
 }
 
 function loadAndRead() {
 
-    if (!currentImage.complete || !pathUrl) {
-        return "Image not loaded yet";
+    if (!pathUrl || !currentImage.complete) {
+        return "Main image not loaded.";
+    }
+
+    if (!maskUrl || !maskImage.complete) {
+        return "Mask image not loaded.";
+    }
+
+    if (
+        currentImage.width !== maskImage.width ||
+        currentImage.height !== maskImage.height
+    ) {
+        return "ERROR: Main image and mask image must have identical dimensions.";
     }
 
     canvas.width = currentImage.width;
     canvas.height = currentImage.height;
 
+    // Read color image
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(currentImage, 0, 0);
 
-    const imgData =
+    const colorData =
+        ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+
+    // Read mask image
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(maskImage, 0, 0);
+
+    const maskData =
         ctx.getImageData(0, 0, canvas.width, canvas.height).data;
 
     let result = "{\n";
@@ -167,19 +228,29 @@ function loadAndRead() {
 
             const i = (y * canvas.width + x) * 4;
 
-            const r = imgData[i + 0];
-            const g = imgData[i + 1];
-            const b = imgData[i + 2];
+            const r = colorData[i + 0];
+            const g = colorData[i + 1];
+            const b = colorData[i + 2];
 
-            const packed = packRGB555(r, g, b);
+            const mr = maskData[i + 0];
+            const mg = maskData[i + 1];
+            const mb = maskData[i + 2];
+
+            const alphaBit =
+                (mr === 0 && mg === 0 && mb === 0)
+                    ? 0
+                    : 1;
+
+            const packed =
+                packRGB555A1(r, g, b, alphaBit);
 
             result +=
-                "{0x"
-                + packed
+                "{0x" +
+                packed
                     .toString(16)
                     .toUpperCase()
-                    .padStart(4, '0')
-                + "}";
+                    .padStart(4, "0") +
+                "}";
 
             if (x < canvas.width - 1)
                 result += ", ";
@@ -206,10 +277,12 @@ function generate() {
 }
 
 function copyOutput() {
+
     navigator.clipboard.writeText(output.value);
 }
 
 function clearOutput() {
+
     output.value = "";
 }
 </script>
